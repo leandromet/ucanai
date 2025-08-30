@@ -1,103 +1,297 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { ConsultationPayload } from '../App'
 
 export default function SportPlanForm({ onSubmit, onPreview }:{ onSubmit:(payload:ConsultationPayload, result:any)=>void, onPreview?:(prompt:string|null, result:any|null)=>void }){
-  const [activity,setActivity] = useState('mountain_bike')
-  const [date,setDate] = useState('2025-09-12')
-  const [groupSize,setGroupSize] = useState(2)
-  const [skill,setSkill] = useState('intermediate')
-  const [duration,setDuration] = useState(4)
-  const [prefs,setPrefs] = useState<string[]>('adventure,scenic'.split(','))
-  const [budget,setBudget] = useState(100)
+  const [activity, setActivity] = useState('mountain_bike')
+  const [date, setDate] = useState('2025-09-12')
+  const [groupSize, setGroupSize] = useState(2)
+  const [skill, setSkill] = useState('intermediate')
+  const [duration, setDuration] = useState(4)
+  const [prefs, setPrefs] = useState<string[]>(['adventure', 'scenic'])
+  const [budget, setBudget] = useState(100)
+  const [notes, setNotes] = useState('')
   const [promptText, setPromptText] = useState<string | null>(null)
   const [localResult, setLocalResult] = useState<any | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  // Available preferences
+  const availablePrefs = [
+    { id: 'adventure', label: 'Adventure' },
+    { id: 'scenic', label: 'Scenic Views' },
+    { id: 'family', label: 'Family-friendly' },
+    { id: 'technical', label: 'Technical Challenge' },
+    { id: 'relaxed', label: 'Relaxed Pace' }
+  ]
+
+  // Helper function to build the payload from form state
+  const buildPayload = (): ConsultationPayload => {
+    return {
+      activity,
+      date,
+      group_size: groupSize,
+      skill_level: skill,
+      duration_hours: duration,
+      preferences: prefs,
+      constraints: { budget_per_person: budget },
+      notes: notes.trim() || undefined
+    };
+  };
+  
+  // Generate preview on mount
+  useEffect(() => {
+    const payload = buildPayload();
+    const prompt = buildPrompt(payload);
+    updatePreview(prompt, null);
+  }, []);
 
   function mockGenerate(payload:ConsultationPayload){
     // Simple local mock result to demo UI without backend
+    const startTime = payload.activity === 'kayak' ? '08:30' : '09:00';
+    const duration = payload.duration_hours || 4; // Default to 4 if undefined
     const r = {
-      overview: `A ${payload.duration_hours}h ${payload.activity.replace('_',' ')} trip in the Okanagan.`,
+      overview: `A ${duration}-hour ${payload.activity.replace('_',' ')} excursion in the beautiful Okanagan region. This ${payload.skill_level}-level adventure is perfect for a group of ${payload.group_size}${payload.preferences?.includes('family') ? ', family-friendly' : ''}.`,
       timeline: [
-        {time:'09:00', activity:'Meet and gear check'},
-        {time:'09:30', activity:'Start route — scenic climb'},
-        {time:'12:00', activity:'Picnic / viewpoint'},
-        {time:'13:00', activity:'Return and debrief'}
+        {time: startTime, activity: 'Meet at the trailhead, equipment check and safety briefing'},
+        {time: (parseInt(startTime.split(':')[0]) + 0.5) + ':' + startTime.split(':')[1], activity: 'Begin the journey with warm-up on easy terrain'},
+        {time: (parseInt(startTime.split(':')[0]) + 2) + ':00', activity: payload.preferences?.includes('scenic') ? 'Scenic viewpoint stop with photo opportunities' : 'Technical section and skills practice'},
+        {time: (parseInt(startTime.split(':')[0]) + 3) + ':00', activity: 'Picnic lunch at a beautiful spot'},
+        {time: (parseInt(startTime.split(':')[0]) + 4) + ':00', activity: 'Return journey with different route options'},
+        {time: (parseInt(startTime.split(':')[0]) + duration) + ':00', activity: 'Return to base, debrief and refreshments'}
+      ].slice(0, Math.max(3, Math.min(duration, 6))),
+      equipment: [
+        'Appropriate footwear',
+        payload.activity.includes('bike') ? 'Helmet (mandatory)' : 'Hat and sunglasses',
+        'Water bottle (at least 1L)',
+        'Snacks/lunch',
+        'Sunscreen',
+        'Weather-appropriate clothing',
+        payload.activity === 'kayak' ? 'Lifejacket (provided)' : 'First aid kit (guide carries)'
       ],
-      equipment: ['Helmet','Water bottle','Snacks','Spare tube'],
-      safety: ['Bring layers','Trail has exposed ridgelines; moderate skill needed'],
-      cost_estimate: {per_person: payload.constraints?.budget_per_person ?? 0},
+      safety: [
+        'Always stay with the group',
+        'Alert guide to any medical conditions before departure',
+        `Trail difficulty rated as ${payload.skill_level}`,
+        'Bring layers for changing weather conditions',
+        payload.skill_level === 'advanced' ? 'Technical sections require full attention' : 'Terrain is suitable for stated skill level',
+      ],
+      cost_estimate: {
+        per_person: payload.constraints?.budget_per_person ?? 0,
+        included: 'Guide, basic equipment, safety gear',
+        extra_costs: 'Optional photography package: $25'
+      },
       alternatives: [
-        {label:'Shorter family-friendly', duration_hours:2, difficulty:'easy'},
-        {label:'Full challenge', duration_hours:6, difficulty:'hard'}
-      ]
-    }
+        {label: 'Shorter beginner-friendly option', duration_hours: Math.max(2, duration - 2), difficulty: 'easy'},
+        {label: 'Extended adventure with extra challenges', duration_hours: duration + 2, difficulty: 'hard'},
+        {label: 'Private customized experience', duration_hours: duration, difficulty: payload.skill_level || 'intermediate', price_increase: 30}
+      ],
+      notes: payload.notes ? `Special requests: ${payload.notes}` : 'No special requests noted.'
+    };
 
-    return r
+    return r;
   }
 
   function buildPrompt(payload:ConsultationPayload){
     // Example of the structured prompt we would send to an LLM
     const prompt = {
-      instruction: 'Produce a normalized JSON plan for an outdoor activity in the Okanagan.',
+      instruction: 'Create a detailed outdoor activity plan for the Okanagan region based on user preferences.',
       metadata: {source: 'ucanai_pilot', timestamp: new Date().toISOString()},
       input: payload,
       output_schema: {
-        overview: 'string',
-        timeline: ['{time:string, activity:string}'],
-        equipment: ['string'],
-        safety: ['string'],
-        cost_estimate: '{per_person:number}',
-        alternatives: ['{label:string, duration_hours:number, difficulty:string}']
+        overview: 'string - A brief summary of the planned activity',
+        timeline: '[{time:string, activity:string}] - Hourly breakdown of the day',
+        equipment: '[string] - List of required and recommended equipment',
+        safety: '[string] - Important safety considerations',
+        cost_estimate: '{per_person:number, included:string, extra_costs:string} - Breakdown of costs',
+        alternatives: '[{label:string, duration_hours:number, difficulty:string, price_increase?:number}] - Alternative options',
+        notes: 'string - Any special considerations based on user input'
       }
-    }
-    return JSON.stringify(prompt, null, 2)
+    };
+    return JSON.stringify(prompt, null, 2);
   }
 
-  // helper to update preview in parent
+  // Helper to update preview in parent
   function updatePreview(prompt:string|null, result:any|null){
-    setPromptText(prompt)
-    setLocalResult(result)
-    if(onPreview) onPreview(prompt, result)
+    setPromptText(prompt);
+    setLocalResult(result);
+    if(onPreview) onPreview(prompt, result);
   }
+
+  // Handle form field changes with a single function
+  const handleFieldChange = (field: string, value: any) => {
+    // Update the local state
+    switch(field) {
+      case 'activity': setActivity(value); break;
+      case 'date': setDate(value); break;
+      case 'groupSize': setGroupSize(Number(value)); break;
+      case 'skill': setSkill(value); break;
+      case 'duration': setDuration(Number(value)); break;
+      case 'budget': setBudget(Number(value)); break;
+      case 'notes': setNotes(value); break;
+      default: break;
+    }
+    
+    // Update payload and preview
+    setTimeout(() => {
+      const updatedPayload = buildPayload();
+      const prompt = buildPrompt(updatedPayload);
+      updatePreview(prompt, localResult);
+    }, 0);
+  };
+
+  // Toggle preference selection
+  const togglePreference = (prefId: string) => {
+    const newPrefs = prefs.includes(prefId)
+      ? prefs.filter(p => p !== prefId)
+      : [...prefs, prefId];
+    
+    setPrefs(newPrefs);
+    
+    setTimeout(() => {
+      const updatedPayload = buildPayload();
+      const prompt = buildPrompt(updatedPayload);
+      updatePreview(prompt, localResult);
+    }, 0);
+  };
+
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsGenerating(true);
+    
+    const payload = buildPayload();
+    const prompt = buildPrompt(payload);
+    updatePreview(prompt, null);
+    
+    // Simulate API call delay
+    setTimeout(() => {
+      const result = mockGenerate(payload);
+      updatePreview(prompt, result);
+      setIsGenerating(false);
+      onSubmit(payload, result);
+    }, 800);
+  };
 
   return (
-    <>
-      <h2>Sport plan — Adventure consultation (Okanagan)</h2>
-      <form onSubmit={(e)=>{e.preventDefault(); const payload:ConsultationPayload={activity,date,group_size:groupSize,skill_level:skill,duration_hours:duration,preferences:prefs,constraints:{budget_per_person:budget}}; const prompt = buildPrompt(payload); updatePreview(prompt, null); const result = mockGenerate(payload); updatePreview(prompt, result); onSubmit(payload,result)}}>
-        <label>Activity
-          <select value={activity} onChange={e=>{setActivity(e.target.value); const p = buildPrompt({activity:e.target.value,date,group_size:groupSize,skill_level:skill,duration_hours:duration,preferences:prefs,constraints:{budget_per_person:budget}} as ConsultationPayload); updatePreview(p, localResult)}}>
-            <option value="mountain_bike">Mountain Bike</option>
-            <option value="road_bike">Road Bike</option>
-            <option value="kayak">Kayak</option>
-            <option value="walking">Walking Trail</option>
-          </select>
+    <div className="sport-plan-form">
+      <h2>Adventure Sport Plan</h2>
+      <p className="form-description">
+        Plan your next outdoor adventure in the beautiful Okanagan region. Complete the form below to generate a customized activity plan.
+      </p>
+      
+      <form onSubmit={handleSubmit}>
+        <div className="form-grid">
+          <div className="form-col">
+            <label>
+              <span>Activity Type</span>
+              <select 
+                value={activity} 
+                onChange={(e) => handleFieldChange('activity', e.target.value)}
+              >
+                <option value="mountain_bike">Mountain Biking</option>
+                <option value="road_bike">Road Cycling</option>
+                <option value="kayak">Kayaking</option>
+                <option value="walking">Hiking Trail</option>
+                <option value="climbing">Rock Climbing</option>
+                <option value="paddle_board">Paddle Boarding</option>
+              </select>
+            </label>
+            
+            <label>
+              <span>Planned Date</span>
+              <input 
+                type="date" 
+                value={date} 
+                onChange={(e) => handleFieldChange('date', e.target.value)}
+              />
+            </label>
+            
+            <label>
+              <span>Group Size</span>
+              <input 
+                type="number" 
+                min={1} 
+                max={20}
+                value={groupSize} 
+                onChange={(e) => handleFieldChange('groupSize', e.target.value)}
+              />
+            </label>
+          </div>
+          
+          <div className="form-col">
+            <label>
+              <span>Skill Level</span>
+              <select 
+                value={skill} 
+                onChange={(e) => handleFieldChange('skill', e.target.value)}
+              >
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </label>
+            
+            <label>
+              <span>Duration (hours)</span>
+              <input 
+                type="range" 
+                min={1} 
+                max={8}
+                value={duration} 
+                onChange={(e) => handleFieldChange('duration', e.target.value)}
+              />
+              <div className="range-value">{duration} hours</div>
+            </label>
+            
+            <label>
+              <span>Budget per person ($)</span>
+              <input 
+                type="number" 
+                min={0} 
+                max={500}
+                step={10}
+                value={budget} 
+                onChange={(e) => handleFieldChange('budget', e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+        
+        <div className="preferences-section">
+          <label>
+            <span>Preferences</span>
+            <div className="preferences-group">
+              {availablePrefs.map(pref => (
+                <label key={pref.id} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={prefs.includes(pref.id)}
+                    onChange={() => togglePreference(pref.id)}
+                  />
+                  <span>{pref.label}</span>
+                </label>
+              ))}
+            </div>
+          </label>
+        </div>
+        
+        <label>
+          <span>Special Requests/Notes</span>
+          <textarea
+            value={notes}
+            placeholder="Any special considerations or requests for your adventure..."
+            onChange={(e) => handleFieldChange('notes', e.target.value)}
+            rows={3}
+          />
         </label>
-        <label>Date <input type="date" value={date} onChange={e=>{setDate(e.target.value); const p = buildPrompt({activity,date: e.target.value,group_size:groupSize,skill_level:skill,duration_hours:duration,preferences:prefs,constraints:{budget_per_person:budget}} as ConsultationPayload); updatePreview(p, localResult)}}/></label>
-        <label>Group size <input type="number" min={1} value={groupSize} onChange={e=>{setGroupSize(Number(e.target.value)); const p = buildPrompt({activity,date,group_size: Number(e.target.value),skill_level:skill,duration_hours:duration,preferences:prefs,constraints:{budget_per_person:budget}} as ConsultationPayload); updatePreview(p, localResult)}}/></label>
-        <label>Skill level
-          <select value={skill} onChange={e=>{setSkill(e.target.value); const p = buildPrompt({activity,date,group_size:groupSize,skill_level:e.target.value,duration_hours:duration,preferences:prefs,constraints:{budget_per_person:budget}} as ConsultationPayload); updatePreview(p, localResult)}}>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-          </select>
-        </label>
-        <label>Duration (hours) <input type="number" min={1} value={duration} onChange={e=>{setDuration(Number(e.target.value)); const p = buildPrompt({activity,date,group_size:groupSize,skill_level:skill,duration_hours: Number(e.target.value),preferences:prefs,constraints:{budget_per_person:budget}} as ConsultationPayload); updatePreview(p, localResult)}}/></label>
-        <label>Budget per person <input type="number" min={0} value={budget} onChange={e=>{setBudget(Number(e.target.value)); const p = buildPrompt({activity,date,group_size:groupSize,skill_level:skill,duration_hours:duration,preferences:prefs,constraints:{budget_per_person: Number(e.target.value)}} as ConsultationPayload); updatePreview(p, localResult)}}/></label>
-        <button type="submit">Generate plan</button>
+        
+        <button 
+          type="submit" 
+          disabled={isGenerating}
+          className={isGenerating ? 'loading' : ''}
+        >
+          {isGenerating ? 'Generating Plan...' : 'Generate Adventure Plan'}
+        </button>
       </form>
-
-      {promptText && (
-        <section style={{marginTop:16}}>
-          <h3>Simulated LLM prompt</h3>
-          <pre style={{whiteSpace:'pre-wrap',background:'rgba(0,0,0,0.2)',padding:12,borderRadius:8}}>{promptText}</pre>
-        </section>
-      )}
-
-      {localResult && (
-        <section style={{marginTop:12}}>
-          <h3>Normalized JSON response (simulated)</h3>
-          <pre style={{whiteSpace:'pre-wrap',background:'rgba(0,0,0,0.2)',padding:12,borderRadius:8}}>{JSON.stringify(localResult, null, 2)}</pre>
-        </section>
-      )}
-    </>
+    </div>
   )
 }

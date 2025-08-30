@@ -1,0 +1,55 @@
+/* Minimal styles for U Can AI pilot frontend */
+:root{
+  --bg:#0f172a;
+  --card:#0b1220;
+  --text:#e6eef8;
+  --muted:#9fb0c8;
+}
+html,body,#root{height:100%;margin:0;padding:0;background:linear-gradient(180deg,#071028 0%, #071a2b 100%);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
+.container{max-width:900px;margin:48px auto;padding:24px;background:rgba(255,255,255,0.02);border-radius:12px;color:var(--text);box-shadow:0 6px 24px rgba(2,6,23,0.6)}
+h1{margin:0 0 12px;font-size:28px}
+p{color:var(--muted);margin:0}
+
+/* simple responsive */
+@media (max-width:600px){.container{margin:24px;padding:16px}}
+
+/* Mobile-friendly & responsive enhancements */
+/* Make nav and controls wrap and be touch-friendly */
+nav{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+nav button{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.04);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+nav button:disabled{opacity:0.55;cursor:not-allowed}
+
+/* Form layout improvements */
+form{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+label{display:flex;flex-direction:column;font-size:14px;color:var(--text)}
+label > span{margin-bottom:6px;color:var(--muted);font-size:13px}
+input,select,textarea,button{font-family:inherit}
+input,select,textarea{padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:var(--text);width:100%;box-sizing:border-box}
+button[type="submit"], .container button{padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(90deg,#0ea5bf,#06b6d4);color:#06202a;font-weight:700}
+
+/* Card-like sections */
+section{margin-top:18px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.02)}
+
+/* Make lists and timeline readable on small screens */
+ol,ul{padding-left:20px}
+
+/* Larger touch targets */
+button,input,select,textarea{touch-action:manipulation}
+
+/* Responsive tweaks */
+@media (max-width:900px){
+  .container{margin:36px 16px;padding:18px}
+}
+@media (max-width:600px){
+  :root{--bg:#071227}
+  .container{margin:18px 12px;padding:14px;border-radius:10px}
+  h1{font-size:20px}
+  p{font-size:14px}
+  nav{gap:6px}
+  nav button{padding:8px 10px;font-size:14px}
+  input,select,textarea{font-size:15px;padding:12px}
+  button[type="submit"], .container button{width:100%;padding:12px}
+}
+
+/* Accessibility hints */
+:focus{outline:2px solid rgba(14,165,191,0.25);outline-offset:2px}

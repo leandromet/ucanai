@@ -1,6 +1,7 @@
-Frontend for U Can AI pilot MVP - React + Vite + TypeScript
+# Frontend for U Can AI pilot MVP - React + Vite + TypeScript
 
 Structure:
+
 - src/
   - components/
   - pages/
@@ -8,5 +9,6 @@ Structure:
   - styles/
 
 Quick start (dev):
+
 - npm install
 - npm run dev
